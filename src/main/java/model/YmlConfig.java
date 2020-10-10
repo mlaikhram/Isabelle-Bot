@@ -10,7 +10,7 @@ public class YmlConfig {
     private String token;
 
     @JsonProperty
-    private TaskChannelGroup channels;
+    private List<TaskChannel> channels;
 
     @JsonProperty
     private List<Long> tasks;
@@ -20,7 +20,7 @@ public class YmlConfig {
         return token;
     }
 
-    public TaskChannelGroup getChannels() {
+    public List<TaskChannel> getChannels() {
         return channels;
     }
 

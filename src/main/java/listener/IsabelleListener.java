@@ -8,7 +8,6 @@ import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import util.MessageUtils;
 
 import javax.annotation.Nonnull;
 import java.util.*;
@@ -16,38 +15,15 @@ import java.util.*;
 public class IsabelleListener extends ListenerAdapter {
 
     private static final Logger logger = LoggerFactory.getLogger(IsabelleListener.class);
-
-//    private static final String NATIONAL_DEX_ENDPOINT = "/wiki/List_of_Pokemon_by_National_Pokedex_number";
-//    private static final int DEFAULT_TIMER_SECONDS = 10;
-
-//    private final String bulbapedia;
-
-    // Used to keep track of which channels have an active "who's that pokemon?" challenge
-//    private final Map<String, GuessPokemon> activeWTPChannels;
-
-    private JDA jda;
-
-//    private YmlConfig config;
-
     private static final String TASK_MESSAGE_TEMPLATE = "%s %s%s";
 
     private List<Long> taskEmotes;
-
-    private TaskChannel toDo;
-    private TaskChannel inProgress;
-    private TaskChannel completed;
+    private List<TaskChannel> taskChannels;
 
 
     public IsabelleListener(YmlConfig config) {
         taskEmotes = config.getTasks();
-
-        toDo = config.getChannels().getToDo();
-        inProgress = config.getChannels().getInProgress();
-        completed = config.getChannels().getCompleted();
-    }
-
-    public void setJDA(JDA jda) {
-        this.jda = jda;
+        taskChannels = config.getChannels();
     }
 
     @Override
@@ -62,30 +38,42 @@ public class IsabelleListener extends ListenerAdapter {
             Emote emote = event.getReactionEmote().getEmote();
 
             logger.info("emote: " + emote);
-            // if task emote added to regular message
+            // if task emote added to regular message, create new task out of message
             if (!isTaskChannel(eventChannel.getIdLong()) && taskEmotes.contains(emote.getIdLong()) && !alreadyContainsTaskEmote(message.getReactions())) {
-                TextChannel channel = guild.getTextChannelById(toDo.getId());
+                TextChannel channel = guild.getTextChannelById(taskChannels.get(0).getId());
                 if (channel != null) {
                     channel.sendMessage(createTaskMessage(emote, null, message.getContentRaw())).queue((sentMessage -> {
-                        sentMessage.addReaction(guild.getEmoteById(toDo.getEmote())).queue();
+                        sentMessage.addReaction(guild.getEmoteById(taskChannels.get(0).getEmote())).queue();
                     }));
                 }
             }
-            // else if progression emote added to task message
+            // else if progression emote added to task message, move to appropriate channel
             else if (isTaskChannel(eventChannel.getIdLong())) {
-                // set to to do
-                if (emote.getIdLong() == toDo.getEmote() && eventChannel.getIdLong() != toDo.getId()) {
+                boolean validEmote = false;
+                for (int i = 0; i < taskChannels.size(); ++i) {
+                    if (emote.getIdLong() == taskChannels.get(i).getEmote() && eventChannel.getIdLong() != taskChannels.get(i).getId()) {
 
+                        // if it is in the to do channel, or if the task owner reacted, move to the appropriate channel
+                        if (eventChannel.getIdLong() == taskChannels.get(0).getId() || message.getMentionedUsers().contains(user)) {
+                            Emote taskEmote = message.getEmotes().get(0);
+                            String taskText = getTaskText(message);
+                            final int targetChannelIndex = i;
+                            guild.getTextChannelById(taskChannels.get(i).getId()).sendMessage(createTaskMessage(taskEmote, i == 0 ? null : user, taskText)).queue((sentMessage) -> {
+                               message.delete().queue();
+                               if (targetChannelIndex != taskChannels.size() - 1) {
+                                   for (int j = 0; j < taskChannels.size(); ++j) {
+                                       if (j != targetChannelIndex) {
+                                           sentMessage.addReaction(guild.getEmoteById(taskChannels.get(j).getEmote())).queue();
+                                       }
+                                   }
+                               }
+                            });
+                        }
+                        validEmote = true;
+                        break;
+                    }
                 }
-                // set to in progress
-                else if (emote.getIdLong() == inProgress.getEmote() && eventChannel.getIdLong() != inProgress.getId()) {
-
-                }
-                // set to complete
-                else if (emote.getIdLong() == completed.getEmote() && eventChannel.getIdLong() != completed.getId()) {
-
-                }
-                else {
+                if (!validEmote) {
                     logger.info("removing emote");
                     message.removeReaction(emote, user).queue();
                 }
@@ -98,7 +86,7 @@ public class IsabelleListener extends ListenerAdapter {
     }
 
     private boolean isTaskChannel(long id) {
-        return id == toDo.getId() || id == inProgress.getId() || id == completed.getId();
+        return taskChannels.stream().anyMatch((channel) -> channel.getId() == id);
     }
 
     private boolean alreadyContainsTaskEmote(List<MessageReaction> reactions) {
@@ -116,5 +104,15 @@ public class IsabelleListener extends ListenerAdapter {
 
     private String createTaskMessage(Emote taskEmote, User user, String message) {
         return String.format(TASK_MESSAGE_TEMPLATE, taskEmote.getAsMention(), user == null ? "" : (user.getAsMention() + " "), message);
+    }
+
+    private String getTaskText(Message message) {
+        int splitSpaceCount = message.getMentionedUsers().isEmpty() ? 1 : 2;
+        int splitIndex = -1;
+        while (splitSpaceCount > 0) {
+            splitIndex = message.getContentRaw().indexOf(" ", splitIndex + 1);
+            --splitSpaceCount;
+        }
+        return message.getContentRaw().substring(splitIndex + 1);
     }
 }
