@@ -43,7 +43,8 @@ public class IsabelleListener extends ListenerAdapter {
                 TextChannel channel = guild.getTextChannelById(taskChannels.get(0).getId());
                 if (channel != null) {
                     channel.sendMessage(createTaskMessage(emote, null, message.getContentRaw())).queue((sentMessage -> {
-                        sentMessage.addReaction(guild.getEmoteById(taskChannels.get(0).getEmote())).queue();
+//                        sentMessage.addReaction(guild.getEmoteById(taskChannels.get(0).getEmote())).queue();
+                        attachEmotes(guild, 0, sentMessage);
                     }));
                 }
             }
@@ -60,13 +61,14 @@ public class IsabelleListener extends ListenerAdapter {
                             final int targetChannelIndex = i;
                             guild.getTextChannelById(taskChannels.get(i).getId()).sendMessage(createTaskMessage(taskEmote, i == 0 ? null : user, taskText)).queue((sentMessage) -> {
                                message.delete().queue();
-                               if (targetChannelIndex != taskChannels.size() - 1) {
-                                   for (int j = 0; j < taskChannels.size(); ++j) {
-                                       if (j != targetChannelIndex) {
-                                           sentMessage.addReaction(guild.getEmoteById(taskChannels.get(j).getEmote())).queue();
-                                       }
-                                   }
-                               }
+                               attachEmotes(guild, targetChannelIndex, sentMessage);
+//                               if (targetChannelIndex != taskChannels.size() - 1) {
+//                                   for (int j = 0; j < taskChannels.size(); ++j) {
+//                                       if (j != targetChannelIndex) {
+//                                           sentMessage.addReaction(guild.getEmoteById(taskChannels.get(j).getEmote())).queue();
+//                                       }
+//                                   }
+//                               }
                             });
                         }
                         validEmote = true;
@@ -100,6 +102,16 @@ public class IsabelleListener extends ListenerAdapter {
         }).reduce(0, Integer::sum);
         logger.info("total task reacts: " + taskEmoteCount);
         return taskEmoteCount > 1;
+    }
+
+    private void attachEmotes(Guild guild, int targetChannelIndex, Message sentMessage) {
+        if (targetChannelIndex != taskChannels.size() - 1) {
+            for (int i = 0; i < taskChannels.size(); ++i) {
+                if (i != targetChannelIndex) {
+                    sentMessage.addReaction(guild.getEmoteById(taskChannels.get(i).getEmote())).queue();
+                }
+            }
+        }
     }
 
     private String createTaskMessage(Emote taskEmote, User user, String message) {
