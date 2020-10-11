@@ -52,10 +52,10 @@ public class IsabelleListener extends ListenerAdapter {
             else if (isTaskChannel(eventChannel.getIdLong())) {
                 boolean validEmote = false;
                 for (int i = 0; i < taskChannels.size(); ++i) {
-                    if (emote.getIdLong() == taskChannels.get(i).getEmote() && eventChannel.getIdLong() != taskChannels.get(i).getId()) {
+                    if (emote.getIdLong() == taskChannels.get(i).getEmote()) {
 
                         // if it is in the to do channel, or if the task owner reacted, move to the appropriate channel
-                        if (eventChannel.getIdLong() == taskChannels.get(0).getId() || message.getMentionedUsers().contains(user)) {
+                        if (eventChannel.getIdLong() != taskChannels.get(i).getId() && (eventChannel.getIdLong() == taskChannels.get(0).getId() || message.getMentionedUsers().contains(user))) {
                             Emote taskEmote = message.getEmotes().get(0);
                             String taskText = getTaskText(message);
                             final int targetChannelIndex = i;
@@ -70,8 +70,8 @@ public class IsabelleListener extends ListenerAdapter {
 //                                   }
 //                               }
                             });
+                            validEmote = true;
                         }
-                        validEmote = true;
                         break;
                     }
                 }
